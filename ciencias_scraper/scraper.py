@@ -87,22 +87,25 @@ def class_table_data(table) -> tuple:
     rows = table.find_all('tr')
     professors = []
     schedule = []
+    
     for row in rows:
         columns = row.find_all('td')
         roles = re.findall(r'Ayudante|Profesor|Ayud. Lab.', columns[0].getText())
         professor = hours = None 
+        
         if len(roles) > 0:
             role = roles[0]
             professor_name = columns[1].getText()
             professor_link = columns[1].find('a')['href']
             id = re.search('\d+', professor_link).group()
-            professor = Professor(role = role, name = professor_name, id = id)
+            professor = Professor(role = role, name = professor_name, id = int(id))
             professors.append(professor)
 
             # This helps to match every case of row by having DAYS at [1] position 
             # ROLE | NAME | DAYS | HOURS
             # or EMPTY | DAYS | HOURS
             columns = columns[1:]
+        
         if len(columns) > 1:
             start, end = re.findall(r'\d+?:\d+|\d+', columns[2].getText())
             days = re.findall(r'lu|ma|mi|ju|vi|sá', columns[1].getText())
@@ -139,22 +142,23 @@ def subject_data(subject_url: str) -> tuple:
     content = soup.find(id = 'info-contenido')
     tables = content.find_all('table')
     classes = []
+
     for table in tables:
         div = table.previous_sibling
         data = re.findall(r'\d+', div.getText())
-        group, enrolled, quota = data
+        group, quota, enrolled = data
         professors, schedule = class_table_data(table)
-        class_data = ClassData(group = group, cast = professors
-                , enrolled = enrolled
-                , quota = quota
+        class_data = ClassData(group = int(group), staff = professors
+                , enrolled = int(enrolled)
+                , quota = int(quota)
                 , schedule = schedule)
         classes.append(class_data)
 
     subject = {
-                'id': id_subject,
-                'semester': semester,
+                'id': int(id_subject),
+                'semester': int(semester),
                 'classes': classes,
-                'plan': plan,
+                'plan': int(plan),
                 'name': name
             }
     return Subject(**subject) 
