@@ -157,8 +157,21 @@ def course_data(course_url: str) -> tuple:
 
     for table, strong in zip(tables, strongs):
         div = table.previous_sibling
+        
+        # "Grupo ####, ## lugares. ## alumnos."
         data = re.findall(r'\d+', strong.parent.getText())
-        group, quota, enrolled = data
+        
+        if len(data) == 1:
+            continue
+
+        group, quota = data[:2]
+        enrolled = None
+        if len(data) == 3:
+            enrolled = data[2]    
+        else:
+            # This case is for "Grupo 9259, 60 lugares. Un alumno."
+            enrolled = 1
+
         professors, schedule = class_table_data(table)
 
         class_data = ClassData(group = int(group), staff = professors

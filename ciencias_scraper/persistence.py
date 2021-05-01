@@ -1,6 +1,6 @@
 from .models import *
 
-def save_all_data(course_data: tuple):
+def save_all_data(course_data: tuple) -> Course:
     '''Saves all the course data, which includes classes
     professors and schedules'''
     create_tables()
@@ -26,7 +26,23 @@ def save_all_data(course_data: tuple):
             for day in days:
                 new_schedule = save_schedule(day, hour)
                 assign_schedule(class_data, new_schedule)
+    
+    return course
 
+def course_exists(id_course: int) -> bool:
+    '''Returns True if a course exists, otherwise False'''
+
+    course = Course.get_or_none(id = id_course)
+    return course is not None
+
+def course_semester_exists(id_course: int, semester: int) -> bool:
+    '''Returns True if a course in a given semester exists, otherwise False'''
+
+    course = Course.get_or_none(id = id_course)
+    if course is None:
+        return False
+    class_data = ClassData.get_or_none(semester = semester, course = course)
+    return class_data is not None
 
 def save_course(course_data: tuple) -> Course:
     '''Saves or gets an existing course
