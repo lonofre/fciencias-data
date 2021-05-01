@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import re
-from .tuples import Subject, ClassData, Hours, Professor 
+from .tuples import Course, ClassData, Hours, Professor 
 
 ciencias_url = 'http://www.fciencias.unam.mx'
 
@@ -28,7 +28,7 @@ def extract_urls(pattern, links) -> list:
 
 
 def major_urls(semester: str = '') -> list:
-    '''Gets the links of the pages where there are all the classes
+    '''Gets the links of the pages where there are all the courses 
     for a major in a given semester
 
     Parameters
@@ -50,8 +50,8 @@ def major_urls(semester: str = '') -> list:
     return [ciencias_url + url for url in urls]
 
 
-def subject_urls(plan_url: str) -> list:
-    '''Gets the links for all the subjects for a given plan major
+def course_urls(plan_url: str) -> list:
+    '''Gets the links for all the courses for a given plan major
     
     Parameters
         plan_url (str): The url that will be scraped
@@ -87,22 +87,29 @@ def class_table_data(table) -> tuple:
     rows = table.find_all('tr')
     professors = []
     schedule = []
+    
     for row in rows:
         columns = row.find_all('td')
-        roles = re.findall(r'Ayudante|Profesor|Ayud. Lab.', columns[0].getText())
+        roles = re.findall(r'Ayudante|Profesor|Ayud. Lab.|Laboratorio', columns[0].getText())
         professor = hours = None 
-        if len(roles) > 0:
+        
+        if roles:
             role = roles[0]
             professor_name = columns[1].getText()
+            
+            if not professor_name:
+                continue    
+
             professor_link = columns[1].find('a')['href']
             id = re.search('\d+', professor_link).group()
-            professor = Professor(role = role, name = professor_name, id = id)
+            professor = Professor(role = role, name = professor_name, id = int(id))
             professors.append(professor)
 
             # This helps to match every case of row by having DAYS at [1] position 
             # ROLE | NAME | DAYS | HOURS
             # or EMPTY | DAYS | HOURS
             columns = columns[1:]
+        
         if len(columns) > 1:
             start, end = re.findall(r'\d+?:\d+|\d+', columns[2].getText())
             days = re.findall(r'lu|ma|mi|ju|vi|sá', columns[1].getText())
@@ -112,51 +119,73 @@ def class_table_data(table) -> tuple:
     return (professors, schedule)
 
 
-def subject_data(subject_url: str) -> tuple:
-    '''Gets all the classes for a given subject url
+def course_data(course_url: str) -> tuple:
+    '''Gets all the classes for a given course url
     Parameters
-        subject_url (str): The url of the subject that will be scraped
+        course_url (str): The url of the course that will be scraped
 
     Returns
-        tuple: contains the information of the subject with the classes
+        tuple: contains the information of the course with the classes
             which has the following structure:
             (id name semester plan classes)
     '''
     
-    soup = get_soup(subject_url)
+    soup = get_soup(course_url)
     
     # It's to avoid the parenthesis: Actuaría (plan 2015)
     major = soup.find('h1').getText().split(' (')[0]
     
     # http://www.fciencias.unam.mx/docencia/horarios/SEMESTER/PLAN/SUBJECTID
-    semester, plan, id_subject = re.findall(r'\d+', subject_url)
+    semester, plan, id_course = re.findall(r'\d+', course_url)
 
     # This returns something like this: 'Álgebra Superior I, Primer Semestre'
-    subject_info = soup.find(text = re.compile(r'\bSemestre\b'))
-    name, _ = subject_info.split(', ')
+    content = soup.find(id = 'info-contenido')
+    name_arr = content.find('h2').getText().split(', ')
+
+    # This it's to deal with multiple commas, such as:
+    # Matemáticas Actuariales para Seguro de Daños, Fianzas y Reaseguro, Sexto Semestre
+    name = ','.join(name_arr[:-1])
     
     # All the info are inside tables
     content = soup.find(id = 'info-contenido')
     tables = content.find_all('table')
     classes = []
-    for table in tables:
+
+    # <strong>Grupo ####</strong>
+    # Its parent contains the quota and the enrolled students
+    strongs = soup.find_all('strong', text=re.compile(r'\bGrupo\b'))
+
+    for table, strong in zip(tables, strongs):
         div = table.previous_sibling
-        data = re.findall(r'\d+', div.getText())
-        group, enrolled, quota = data
+        
+        # "Grupo ####, ## lugares. ## alumnos."
+        data = re.findall(r'\d+', strong.parent.getText())
+        
+        if len(data) == 1:
+            continue
+
+        group, quota = data[:2]
+        enrolled = None
+        if len(data) == 3:
+            enrolled = data[2]    
+        else:
+            # This case is for "Grupo 9259, 60 lugares. Un alumno."
+            enrolled = 1
+
         professors, schedule = class_table_data(table)
-        class_data = ClassData(group = group, cast = professors
-                , enrolled = enrolled
-                , quota = quota
+
+        class_data = ClassData(group = int(group), staff = professors
+                , enrolled = int(enrolled)
+                , quota = int(quota)
                 , schedule = schedule)
         classes.append(class_data)
 
-    subject = {
-                'id': id_subject,
-                'semester': semester,
+    course = {
+                'id': int(id_course),
+                'semester': int(semester),
                 'classes': classes,
-                'plan': plan,
+                'plan': int(plan),
                 'name': name
             }
-    return Subject(**subject) 
 
-
+    return Course(**course) 
