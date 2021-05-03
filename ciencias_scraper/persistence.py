@@ -3,7 +3,6 @@ from .models import *
 def save_all_data(course_data: tuple) -> Course:
     '''Saves all the course data, which includes classes
     professors and schedules'''
-    create_tables()
 
     course = save_course(course_data)
     _, _, semester, id_plan, classes = course_data 
