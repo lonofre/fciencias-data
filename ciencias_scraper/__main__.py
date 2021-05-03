@@ -3,7 +3,7 @@ import time
 import re
 from .persistence import save_all_data, course_exists, course_semester_exists, assign_plan
 from .scraper import major_urls, course_urls, course_data
-from .models import Course
+from .models import Course, create_tables
 
 request_delay = 10
 
@@ -18,6 +18,7 @@ def scrap_semester(semester = ''):
 
     total_majors = len(majors)
     print(f'- Majors to scrap: {total_majors}')
+    create_tables()
     for count, major in enumerate(majors, start = 1):
         urls = course_urls(major)
 
